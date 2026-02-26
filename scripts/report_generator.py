@@ -81,9 +81,11 @@ def write_interpretation(kpis: dict) -> str:
         lines.append("<p>Per channel/modulation: ")
         parts = []
         for r in by_cm:
-            parts.append(
-                f"{r['channel_type']}-{r['modulation']} (BLER={r['mean_bler']:.4f}, throughput={r['mean_effective_throughput']:.4f})"
-            )
+            bler = r.get("mean_bler")
+            thr = r.get("mean_effective_throughput")
+            bler_s = f"{bler:.4f}" if bler is not None else "N/A"
+            thr_s = f"{thr:.4f}" if thr is not None else "N/A"
+            parts.append(f"{r.get('channel_type', '?')}-{r.get('modulation', '?')} (BLER={bler_s}, throughput={thr_s})")
         lines.append(", ".join(parts) + ".</p>")
 
     return "\n".join(lines)

@@ -15,8 +15,15 @@ def load_raw_jsons(raw_dir: Path) -> list[dict]:
     if not raw_dir.is_dir():
         raise FileNotFoundError(f"Raw directory not found: {raw_dir}")
 
+    paths = list(raw_dir.glob("*.json"))
+    if not paths:
+        raise FileNotFoundError(f"No JSON files found in {raw_dir}")
+
+    def sort_key(p: Path) -> int:
+        return int(p.stem) if p.stem.isdigit() else -1
+
     rows = []
-    for path in sorted(raw_dir.glob("*.json"), key=lambda p: int(p.stem) if p.stem.isdigit() else 0):
+    for path in sorted(paths, key=sort_key):
         with open(path, encoding="utf-8") as f:
             rows.append(json.load(f))
     return rows
