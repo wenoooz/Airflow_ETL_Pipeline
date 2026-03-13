@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-01-01T00:00:00",
+  "run_id": "pipeline_test_run",
+  "run_index": 104,
+  "seed": 4108113057,
+  "snr_db": 8,
+  "channel_type": "Rayleigh",
+  "modulation": "16QAM",
+  "bler": 0.48999999999999994,
+  "ber": 0.048999999999999995,
+  "effective_throughput": 2.04,
+  "num_frames": 1000,
+  "total_bits": 100000,
+  "total_bit_errors": 4899,
+  "total_blocks": 1000,
+  "total_block_errors": 489
+}

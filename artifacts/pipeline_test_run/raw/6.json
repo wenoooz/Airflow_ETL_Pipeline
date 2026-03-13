@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-01-01T00:00:00",
+  "run_id": "pipeline_test_run",
+  "run_index": 6,
+  "seed": 4108112959,
+  "snr_db": 4,
+  "channel_type": "AWGN",
+  "modulation": "QPSK",
+  "bler": 0.42,
+  "ber": 0.042,
+  "effective_throughput": 1.1600000000000001,
+  "num_frames": 1000,
+  "total_bits": 100000,
+  "total_bit_errors": 4200,
+  "total_blocks": 1000,
+  "total_block_errors": 420
+}
