@@ -21,11 +21,12 @@ default_args = {
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
+DAG_DIR = os.path.dirname(__file__)
+PROJECT_ROOT = os.path.dirname(DAG_DIR)
 
 def get_project_root():
-    # In Airflow context, we might need to be careful with paths
-    # Assuming the current working directory or AIRFLOW_HOME is related to project root
-    return os.environ.get('PROJECT_ROOT', 'd:/Project Computer Application/Airflow_ETL_Pipeline')
+    return os.environ.get('PROJECT_ROOT', PROJECT_ROOT)
+
 
 def run_simulations_callable(run_id, **kwargs):
     """
