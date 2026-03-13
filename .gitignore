@@ -1,0 +1,15 @@
+# 忽略虚拟环境
+myvenv/
+venv/
+env/
+
+# 忽略 Python 缓存
+__pycache__/
+*.pyc
+
+# 忽略运行结果和日志
+artifacts/
+logs/
+
+# 忽略 VS Code 配置
+.vscode/
