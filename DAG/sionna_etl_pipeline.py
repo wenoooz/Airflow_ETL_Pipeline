@@ -55,7 +55,7 @@ def run_simulations_callable(run_id, **kwargs):
     project_root = get_project_root()
     from sionna_simulator import main as sim_main
     
-    plan_path = os.path.join(project_root, 'artifacts', run_id, 'run_plan.json')
+    plan_path = os.path.join(project_root, 'artifacts', _safe_run_id(run_id), 'run_plan.json')
     with open(plan_path, 'r', encoding='utf-8') as f:
         plan_data = json.load(f)
     
