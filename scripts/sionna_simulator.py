@@ -2,7 +2,10 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
+
 import numpy as np
+
+from _path_utils import safe_run_id
 import tensorflow as tf
 
 # Sionna imports
@@ -167,7 +170,7 @@ def main(run_id: str, run_index: int, run_plan_path: Path | None = None) -> None
     project_root = get_project_root()
 
     if run_plan_path is None:
-        run_plan_path = project_root / "artifacts" / run_id / "run_plan.json"
+        run_plan_path = project_root / "artifacts" / safe_run_id(run_id) / "run_plan.json"
 
     # Load run plan
     with open(run_plan_path, encoding="utf-8") as f:
@@ -217,7 +220,7 @@ def main(run_id: str, run_index: int, run_plan_path: Path | None = None) -> None
     }
 
     # Write output JSON
-    output_dir = project_root / "artifacts" / run_id / "raw"
+    output_dir = project_root / "artifacts" / safe_run_id(run_id) / "raw"
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{run_index}.json"
 

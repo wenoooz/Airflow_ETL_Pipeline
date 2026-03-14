@@ -14,11 +14,15 @@ SCRIPTS_DIR = os.path.join(os.environ.get('AIRFLOW_HOME', '/opt/airflow'), 'scri
 if os.path.exists(SCRIPTS_DIR):
     sys.path.insert(0, SCRIPTS_DIR)
 
-def cleanup_artifacts(context):
+def _safe_run_id(run_id):
+    """Windows-safe folder name (Airflow run_id can contain ':')."""
+    return run_id.replace(":", "-")
 
+
+def cleanup_artifacts(context):
     run_id = context.get('run_id')
     project_root = get_project_root()
-    artifact_dir = os.path.join(project_root, 'artifacts', run_id)
+    artifact_dir = os.path.join(project_root, 'artifacts', _safe_run_id(run_id))
     
     if os.path.exists(artifact_dir):
         logging.info(f"Cleaning up artifacts for failed run {run_id} at {artifact_dir}")

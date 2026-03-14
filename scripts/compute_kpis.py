@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from _path_utils import safe_run_id
+
 def get_project_root() -> Path:
     """Resolve project root (parent of scripts/)."""
     return Path(__file__).resolve().parent.parent
@@ -94,7 +96,7 @@ def run_kpi_computation(run_id: str, project_root: Path | None = None) -> dict:
     if project_root is None:
         project_root = get_project_root()
 
-    csv_path = project_root / "artifacts" / run_id / "dataset.csv"
+    csv_path = project_root / "artifacts" / safe_run_id(run_id) / "dataset.csv"
     df = load_dataset(csv_path)
 
     overall = compute_overall_kpis(df)
@@ -116,7 +118,7 @@ def main(run_id: str, project_root: Path | None = None) -> Path:
     if project_root is None:
         project_root = get_project_root()
 
-    output_path = project_root / "artifacts" / run_id / "kpis.json"
+    output_path = project_root / "artifacts" / safe_run_id(run_id) / "kpis.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_path, "w", encoding="utf-8") as f:

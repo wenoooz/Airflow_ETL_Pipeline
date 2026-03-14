@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from _path_utils import safe_run_id
+
 
 def get_project_root() -> Path:
     """Resolve project root (parent of scripts/)."""
@@ -55,11 +57,12 @@ def main(run_id: str, project_root: Path | None = None) -> Path:
     if project_root is None:
         project_root = get_project_root()
 
-    raw_dir = project_root / "artifacts" / run_id / "raw"
+    base = project_root / "artifacts" / safe_run_id(run_id)
+    raw_dir = base / "raw"
     rows = load_raw_jsons(raw_dir)
     df = transform_to_table(rows)
 
-    output_path = project_root / "artifacts" / run_id / "dataset.csv"
+    output_path = base / "dataset.csv"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_path, index=False, encoding="utf-8")
 

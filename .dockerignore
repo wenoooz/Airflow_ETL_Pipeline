@@ -1,0 +1,7 @@
+artifacts
+.env
+.git
+__pycache__
+*.pyc
+.pytest_cache
+*.egg-info

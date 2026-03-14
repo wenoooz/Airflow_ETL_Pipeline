@@ -3,6 +3,8 @@ import sys
 from pathlib import Path
 
 import matplotlib
+
+from _path_utils import safe_run_id
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -130,7 +132,7 @@ def main(run_id: str, project_root: Path | None = None) -> Path:
     if project_root is None:
         project_root = get_project_root()
 
-    base = project_root / "artifacts" / run_id
+    base = project_root / "artifacts" / safe_run_id(run_id)
     kpis_path = base / "kpis.json"
     kpis = load_kpis(kpis_path)
     bler_vs_snr = kpis.get("bler_vs_snr", [])

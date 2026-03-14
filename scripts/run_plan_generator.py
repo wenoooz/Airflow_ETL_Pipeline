@@ -14,6 +14,8 @@ from pathlib import Path
 
 import yaml
 
+from _path_utils import safe_run_id
+
 
 def get_project_root() -> Path:
     """Resolve project root (parent of scripts/)."""
@@ -77,7 +79,7 @@ def main(run_id: str | None = None) -> str:
     config = load_config(config_path)
     run_plan = generate_run_plan(config, run_id)
 
-    output_dir = project_root / "artifacts" / run_id
+    output_dir = project_root / "artifacts" / safe_run_id(run_id)
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "run_plan.json"
 

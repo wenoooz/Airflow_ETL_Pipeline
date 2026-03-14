@@ -1,0 +1,27 @@
+
+version: "3.8"
+
+services:
+  airflow:
+    build: .
+    image: airflow-sionna:latest
+    container_name: airflow-sionna
+    user: "${AIRFLOW_UID:-50000}:0"
+    volumes:
+      - .:/opt/airflow
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/DAG
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      PROJECT_ROOT: /opt/airflow
+    working_dir: /opt/airflow
+    command: airflow standalone
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

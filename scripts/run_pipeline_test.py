@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # If run.
@@ -37,6 +38,8 @@ def main() -> None:
     run_plan = data["run_plan"]
     raw_dir = root / "artifacts" / run_id / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
+    # Use run_plan timestamp so mock data matches the run time; fallback to now()
+    run_ts = data.get("timestamp") or datetime.now().isoformat()
 
     for row in run_plan:
         # Mock metrics: BLER/BER decrease with SNR, Rayleigh worse than AWGN, 16QAM worse than QPSK
@@ -47,7 +50,7 @@ def main() -> None:
         ber = bler * 0.1
         thr = (1 - bler) * (4 if mod == "16QAM" else 2)
         out = {
-            "timestamp": "2025-01-01T00:00:00",
+            "timestamp": run_ts,
             "run_id": run_id,
             "run_index": row["run_index"],
             "seed": row["seed"],

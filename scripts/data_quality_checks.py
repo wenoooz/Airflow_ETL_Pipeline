@@ -7,6 +7,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from _path_utils import safe_run_id
+
 
 def _to_native(obj):
     """Convert numpy types to native Python for JSON serialization."""
@@ -154,7 +156,7 @@ def run_checks(run_id: str, project_root: Path | None = None) -> dict:
     if project_root is None:
         project_root = get_project_root()
 
-    base = project_root / "artifacts" / run_id
+    base = project_root / "artifacts" / safe_run_id(run_id)
     csv_path = base / "dataset.csv"
     run_plan_path = base / "run_plan.json"
 
@@ -190,7 +192,7 @@ def main(run_id: str, project_root: Path | None = None) -> Path:
     """
     result = run_checks(run_id, project_root)
 
-    output_path = (project_root or get_project_root()) / "artifacts" / run_id / "dq_checks.json"
+    output_path = (project_root or get_project_root()) / "artifacts" / safe_run_id(run_id) / "dq_checks.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     out = _to_native(result)
     with open(output_path, "w", encoding="utf-8") as f:
