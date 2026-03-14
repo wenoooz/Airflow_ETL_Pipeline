@@ -50,8 +50,12 @@ def simulate_siso_link(
     seed: int,
 ) -> dict:   
     # Set random seeds for reproducibility
-    tf.random.set_seed(seed)
+    import random
+    random.seed(seed)
     np.random.seed(seed)
+    tf.random.set_seed(seed)
+    # For full reproducibility on GPU, though might slow down simulation
+    # os.environ['TF_DETERMINISTIC_OPS'] = '1'
 
     # Create components
     mapper, demapper, num_bits_per_symbol = create_modulation(modulation)

@@ -1,15 +1,38 @@
 from airflow import DAG
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.python import PythonOperator
+try:
+    from airflow.providers.standard.operators.hitl import HITLOperator
+except ImportError:
+    # Fallback for older Airflow versions or missing provider
+    from airflow.operators.empty import EmptyOperator as HITLOperator
 from datetime import datetime, timedelta
 import os
 import sys
 import json
+import shutil
+import logging
 
 # Add scripts to sys.path to allow importing modules
 SCRIPTS_DIR = os.path.join(os.environ.get('AIRFLOW_HOME', '/opt/airflow'), 'scripts')
 if os.path.exists(SCRIPTS_DIR):
     sys.path.insert(0, SCRIPTS_DIR)
+
+def cleanup_artifacts(context):
+    """
+    Callback function to clean up artifacts if a task fails.
+    """
+    run_id = context.get('run_id')
+    project_root = get_project_root()
+    artifact_dir = os.path.join(project_root, 'artifacts', run_id)
+    
+    if os.path.exists(artifact_dir):
+        logging.info(f"Cleaning up artifacts for failed run {run_id} at {artifact_dir}")
+        try:
+            shutil.rmtree(artifact_dir)
+            logging.info(f"Successfully removed {artifact_dir}")
+        except Exception as e:
+            logging.error(f"Failed to remove {artifact_dir}: {e}")
 
 # Default arguments for the DAG
 default_args = {
@@ -20,6 +43,7 @@ default_args = {
     'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
+    'on_failure_callback': cleanup_artifacts,
 }
 DAG_DIR = os.path.dirname(__file__)
 PROJECT_ROOT = os.path.dirname(DAG_DIR)
@@ -104,6 +128,13 @@ with DAG(
         },
     )
 
+    # 5.5 Human-in-the-loop: Review KPIs before generating report
+    review_results = HITLOperator(
+        task_id='review_results',
+        subject="Review Simulation KPIs for run {{ run_id }}",
+        body="Please review the computed KPIs and data quality checks before generating the final report.",
+    )
+
     # 6. Report Generation
     generate_report = BashOperator(
         task_id='generate_report',
@@ -115,4 +146,4 @@ with DAG(
     )
 
     # Set dependencies
-    generate_plan >> simulate >> transform >> quality_check >> compute_kpis >> generate_report
+    generate_plan >> simulate >> transform >> quality_check >> compute_kpis >> review_results >> generate_report
