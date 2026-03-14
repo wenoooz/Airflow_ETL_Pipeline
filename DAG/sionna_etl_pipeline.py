@@ -1,11 +1,7 @@
 from airflow import DAG
-from airflow.providers.standard.operators.bash import BashOperator
-from airflow.providers.standard.operators.python import PythonOperator
-try:
-    from airflow.providers.standard.operators.hitl import HITLOperator
-except ImportError:
-    # Fallback for older Airflow versions or missing provider
-    from airflow.operators.empty import EmptyOperator as HITLOperator
+from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
+from airflow.operators.empty import EmptyOperator
 from datetime import datetime, timedelta
 import os
 import sys
@@ -19,9 +15,7 @@ if os.path.exists(SCRIPTS_DIR):
     sys.path.insert(0, SCRIPTS_DIR)
 
 def cleanup_artifacts(context):
-    """
-    Callback function to clean up artifacts if a task fails.
-    """
+
     run_id = context.get('run_id')
     project_root = get_project_root()
     artifact_dir = os.path.join(project_root, 'artifacts', run_id)
@@ -53,10 +47,7 @@ def get_project_root():
 
 
 def run_simulations_callable(run_id, **kwargs):
-    """
-    Simulation step: Loads the run plan and executes all simulation rows.
-    In a real production environment, this might be parallelized using Task Mapping.
-    """
+
     project_root = get_project_root()
     from sionna_simulator import main as sim_main
     
@@ -129,11 +120,10 @@ with DAG(
     )
 
     # 5.5 Human-in-the-loop: Review KPIs before generating report
-    review_results = HITLOperator(
+    review_results = EmptyOperator(
         task_id='review_results',
-        subject="Review Simulation KPIs for run {{ run_id }}",
-        body="Please review the computed KPIs and data quality checks before generating the final report.",
     )
+
 
     # 6. Report Generation
     generate_report = BashOperator(

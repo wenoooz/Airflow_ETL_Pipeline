@@ -25,7 +25,8 @@ def create_channel(channel_type: str, **kwargs):
     if channel_type.upper() == "AWGN":
         return AWGN()
     elif channel_type.upper() == "RAYLEIGH":
-        return RayleighBlockFading(num_rx=1, num_tx=1, block_length=kwargs.get("block_length", 1))
+        # Current Sionna RayleighBlockFading expects num_rx, num_tx, num_rx_ant, num_tx_ant
+        return RayleighBlockFading(num_rx=1, num_tx=1, num_rx_ant=1, num_tx_ant=1)
     else:
         raise ValueError(f"Unknown channel type: {channel_type}")
 
@@ -89,32 +90,36 @@ def simulate_siso_link(
         # Channel processing
         if channel_type.upper() == "AWGN":
             # AWGN channel: normalize power and add noise
-            # Normalize symbol power to 1
             symbol_power = tf.reduce_mean(tf.abs(symbols) ** 2)
-            symbols_normalized = symbols / tf.sqrt(symbol_power + 1e-10)
-            # Use AWGN channel layer
-            received_symbols = channel([symbols_normalized, snr_db])
+            norm = tf.cast(tf.sqrt(symbol_power + 1e-10), symbols.dtype)
+            symbols_normalized = symbols / norm
+            out = channel([symbols_normalized, tf.cast(snr_db, tf.float32)])
+            received_symbols = out[0] if isinstance(out, (list, tuple)) else out
         else:
-            # Rayleigh channel: apply fading then AWGN
-            # Reshape for RayleighBlockFading: [batch_size, num_rx, num_tx, num_time_steps]
-            # For SISO: [batch_size, 1, 1, num_symbols]
-            symbols_reshaped = tf.expand_dims(tf.expand_dims(symbols, axis=1), axis=2)
-            # Normalize power
-            symbol_power = tf.reduce_mean(tf.abs(symbols_reshaped) ** 2)
-            symbols_normalized = symbols_reshaped / tf.sqrt(symbol_power + 1e-10)
-            # Apply Rayleigh fading
-            # Channel returns [batch_size, num_rx, num_tx, num_time_steps]
-            h = channel([current_batch_size, num_symbols_per_frame])
-            h_reshaped = tf.expand_dims(tf.expand_dims(h, axis=1), axis=2)
-            faded_symbols = h_reshaped * symbols_normalized
-            # Add AWGN noise
+            # Rayleigh: use 2D throughout so AWGN gets same shape as in AWGN branch (avoids shape mismatches)
+            symbol_power = tf.reduce_mean(tf.abs(symbols) ** 2)
+            norm = tf.cast(tf.sqrt(symbol_power + 1e-10), symbols.dtype)
+            symbols_normalized = symbols / norm
+            # Get channel gains: RayleighBlockFading(batch_size, num_time_steps) -> tuple, first element is h
+            out = channel(current_batch_size, num_symbols_per_frame)
+            h = out[0] if isinstance(out, (list, tuple)) else out
+            # Force h to 2D [batch, num_symbols]; mapper output may be [batch, num_symbols, 1]
+            h_flat = tf.reshape(h, [-1])
+            h_2d = tf.reshape(h_flat, [current_batch_size, num_symbols_per_frame])
+            h_2d = tf.cast(h_2d, symbols_normalized.dtype)
+            symbols_2d = tf.squeeze(symbols_normalized, axis=-1)  # [batch, num_symbols]
+            faded_2d = h_2d * symbols_2d
+            faded_symbols = tf.expand_dims(faded_2d, axis=-1)  # [batch, num_symbols, 1] for AWGN
             awgn = AWGN()
-            received_symbols_reshaped = awgn([faded_symbols, snr_db])
-            # Reshape back: [batch_size, num_symbols]
-            received_symbols = tf.squeeze(received_symbols_reshaped, axis=[1, 2])
+            snr_tensor_ray = tf.cast(snr_db, tf.float32)
+            out_awgn = awgn([faded_symbols, snr_tensor_ray])
+            received_symbols = out_awgn[0] if isinstance(out_awgn, (list, tuple)) else out_awgn
+            if len(received_symbols.shape) == 3 and received_symbols.shape[-1] == 1:
+                received_symbols = tf.squeeze(received_symbols, axis=-1)
 
-        # Demap symbols to LLRs (demapper expects [batch, num_symbols] and SNR)
-        llrs = demapper([received_symbols, snr_db])
+        # Demap symbols to LLRs (demapper expects [batch, num_symbols] and SNR as float32)
+        snr_tensor = tf.cast(snr_db, tf.float32)
+        llrs = demapper([received_symbols, snr_tensor])
 
         # Hard decision: convert LLRs to bits
         bits_hat = tf.cast(llrs > 0, tf.float32)

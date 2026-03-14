@@ -27,11 +27,12 @@ def load_config(config_path: Path) -> dict:
 
 
 def generate_run_plan(config: dict, run_id: str) -> list[dict]:
-    """
-    Generate run plan: Cartesian product of channel_types × modulations × snr_db × repeats.
-    Each row gets a deterministic seed for reproducibility.
-    """
     channel_types = config["channel_types"]
+    channel_types_ordered = (
+        ["Rayleigh", "AWGN"]
+        if "Rayleigh" in channel_types and "AWGN" in channel_types
+        else channel_types
+    )
     modulations = config["modulations"]
     snr_db = config["snr_db"]
     repeats = config["repeats"]
@@ -41,7 +42,7 @@ def generate_run_plan(config: dict, run_id: str) -> list[dict]:
     # Cartesian product: (channel, modulation, snr, repeat_idx)
     repeat_indices = list(range(repeats))
     combinations = list(
-        itertools.product(channel_types, modulations, snr_db, repeat_indices)
+        itertools.product(channel_types_ordered, modulations, snr_db, repeat_indices)
     )
 
     run_plan = []
