@@ -103,12 +103,27 @@ def run_kpi_computation(run_id: str, project_root: Path | None = None) -> dict:
     by_channel_mod = compute_by_channel_modulation(df)
     bler_vs_snr = compute_bler_vs_snr(df)
 
+    # Lightweight metadata to describe the simulation grid for the report
+    channel_types = sorted(df["channel_type"].dropna().unique().tolist())
+    modulations = sorted(df["modulation"].dropna().unique().tolist())
+    snr_values = sorted(df["snr_db"].dropna().unique().tolist())
+    meta = {
+        "num_rows": int(len(df)),
+        "num_channel_types": len(channel_types),
+        "num_modulations": len(modulations),
+        "num_snr_values": len(snr_values),
+        "channel_types": channel_types,
+        "modulations": modulations,
+        "snr_values": snr_values,
+    }
+
     return {
         "run_id": run_id,
         "generated_at": datetime.now().isoformat(),
         "overall": overall,
         "by_channel_modulation": by_channel_mod,
         "bler_vs_snr": bler_vs_snr,
+        "meta": meta,
     }
 
 
