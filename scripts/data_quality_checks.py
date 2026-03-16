@@ -142,6 +142,33 @@ def check_snr_matches_plan(df: pd.DataFrame, expected_snr: list) -> dict:
     }
 
 
+def check_parameter_combinations(df: pd.DataFrame, run_plan_data: dict) -> dict:
+    """Check that every planned (channel, modulation, snr) combination exists in the dataset."""
+    plan = run_plan_data.get("run_plan", [])
+    expected_combos = set()
+    for row in plan:
+        # Create a canonical tuple representation
+        combo = (row["channel_type"], row["modulation"], float(row["snr_db"]))
+        expected_combos.add(combo)
+
+    actual_combos = set()
+    for _, row in df.iterrows():
+        combo = (row["channel_type"], row["modulation"], float(row["snr_db"]))
+        actual_combos.add(combo)
+
+    missing = expected_combos - actual_combos
+    extra = actual_combos - expected_combos
+    passed = len(missing) == 0 and len(extra) == 0
+
+    return {
+        "check": "parameter_combinations_match_plan",
+        "passed": passed,
+        "missing_combos": list(missing),
+        "extra_combos": list(extra),
+        "message": "All parameter combinations match plan" if passed else f"Combo mismatch: missing {len(missing)}, extra {len(extra)}",
+    }
+
+
 def run_checks(run_id: str, project_root: Path | None = None) -> dict:
     """
     Run all data quality checks and return results.
@@ -173,6 +200,7 @@ def run_checks(run_id: str, project_root: Path | None = None) -> dict:
         check_row_count(df, expected_size),
         check_metric_ranges(df),
         check_snr_matches_plan(df, expected_snr),
+        check_parameter_combinations(df, run_plan_data),
     ]
 
     all_passed = all(c["passed"] for c in checks)

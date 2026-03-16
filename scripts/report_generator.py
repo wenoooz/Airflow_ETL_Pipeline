@@ -139,15 +139,39 @@ def write_interpretation(kpis: dict) -> str:
     overall = kpis.get("overall", {})
     by_cm = kpis.get("by_channel_modulation", [])
     meta = kpis.get("meta", {})
+    bler_vs_snr = kpis.get("bler_vs_snr", [])
+
+    # Dynamic interpretation logic
+    interpretation_text = (
+        "Analysis of the simulation results reveals several key trends in link performance. "
+    )
+    
+    if bler_vs_snr:
+        df = pd.DataFrame(bler_vs_snr)
+        # Check if BLER decreases as SNR increases (General trend)
+        correlation = df['snr_db'].corr(df['mean_bler'])
+        if correlation < -0.5:
+            interpretation_text += "As expected, the Block Error Rate (BLER) generally decreases as the Signal-to-Noise Ratio (SNR) increases across all configurations. "
+        
+        # Compare AWGN vs Rayleigh if both exist
+        if 'AWGN' in df['channel_type'].values and 'Rayleigh' in df['channel_type'].values:
+            awgn_bler = df[df['channel_type'] == 'AWGN']['mean_bler'].mean()
+            rayleigh_bler = df[df['channel_type'] == 'Rayleigh']['mean_bler'].mean()
+            if rayleigh_bler > awgn_bler:
+                interpretation_text += "The Rayleigh fading channel exhibits significantly higher error rates compared to the AWGN channel at equivalent SNR levels, due to multipath fading effects. "
+
+        # Compare QPSK vs 16QAM
+        if 'QPSK' in df['modulation'].values and '16QAM' in df['modulation'].values:
+            qpsk_bler = df[df['modulation'] == 'QPSK']['mean_bler'].mean()
+            qam_bler = df[df['modulation'] == '16QAM']['mean_bler'].mean()
+            if qam_bler > qpsk_bler:
+                interpretation_text += "Furthermore, 16QAM modulation proves less robust than QPSK, particularly in low SNR regimes, trading off reliability for higher potential spectral efficiency. "
 
     lines = [
         f"<h2>Interpretation (Run: {run_id})</h2>",
         "<p>",
-        "Across the simulated SNR range, BLER and BER change only moderately: AWGN/QPSK shows the best reliability with the lowest error rates, ",
-        "AWGN/16QAM is slightly worse, and both Rayleigh curves stay at higher BLER/BER for all SNR values, reflecting the extra variability from fading. ",
-        "This means that for a given SNR, Rayleigh typically needs more link margin than AWGN to reach the same BLER/BER target. ",
-        "Comparing modulations, QPSK is more robust than 16QAM on the same channel, especially at the lower SNR points where the gap between the orange (AWGN/QPSK) and blue (AWGN/16QAM) curves is largest. ",
-        "The three plots above summarize these trade-offs between reliability and throughput across channel types and modulations.",
+        interpretation_text,
+        "The plots above visually confirm these findings, showing clear performance gaps between different channel and modulation combinations.",
         "</p>",
     ]
 

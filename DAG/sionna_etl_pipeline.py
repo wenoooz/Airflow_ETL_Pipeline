@@ -10,7 +10,10 @@ import shutil
 import logging
 
 # Add scripts to sys.path to allow importing modules
-SCRIPTS_DIR = os.path.join(os.environ.get('AIRFLOW_HOME', '/opt/airflow'), 'scripts')
+# We'll use the directory relative to this DAG file as a fallback
+DAG_DIR = os.path.dirname(__file__)
+PROJECT_ROOT_DEFAULT = os.path.dirname(DAG_DIR)
+SCRIPTS_DIR = os.path.join(os.environ.get('PROJECT_ROOT', PROJECT_ROOT_DEFAULT), 'scripts')
 if os.path.exists(SCRIPTS_DIR):
     sys.path.insert(0, SCRIPTS_DIR)
 
@@ -124,8 +127,23 @@ with DAG(
     )
 
     # 5.5 Human-in-the-loop: Review KPIs before generating report
-    review_results = EmptyOperator(
+    # Note: In a production environment with Airflow 2.10+, you would use HITLOperator.
+    # For this project, we implement a review step that logs the KPI path for manual verification.
+    def review_kpis_callable(run_id, **kwargs):
+        project_root = get_project_root()
+        kpi_path = os.path.join(project_root, 'artifacts', _safe_run_id(run_id), 'kpis.json')
+        logging.info(f"--- HITL Review Required ---")
+        logging.info(f"Please review simulation KPIs at: {kpi_path}")
+        if os.path.exists(kpi_path):
+            with open(kpi_path, 'r') as f:
+                kpis = json.load(f)
+                logging.info(f"Overall Mean BLER: {kpis.get('overall', {}).get('mean_bler')}")
+        logging.info(f"Proceeding to report generation...")
+
+    review_results = PythonOperator(
         task_id='review_results',
+        python_callable=review_kpis_callable,
+        op_kwargs={'run_id': '{{ run_id }}'},
     )
 
 

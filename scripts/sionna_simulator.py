@@ -99,24 +99,36 @@ def simulate_siso_link(
             out = channel([symbols_normalized, tf.cast(snr_db, tf.float32)])
             received_symbols = out[0] if isinstance(out, (list, tuple)) else out
         else:
-            # Rayleigh: use 2D throughout so AWGN gets same shape as in AWGN branch (avoids shape mismatches)
+            # Rayleigh: ensure shapes match for point-to-point multiplication
+            # Mapper output is [batch, num_symbols, bits_per_symbol] (Sionna 0.18+)
+            # We need to normalize and apply channel
             symbol_power = tf.reduce_mean(tf.abs(symbols) ** 2)
             norm = tf.cast(tf.sqrt(symbol_power + 1e-10), symbols.dtype)
             symbols_normalized = symbols / norm
-            # Get channel gains: RayleighBlockFading(batch_size, num_time_steps) -> tuple, first element is h
-            out = channel(current_batch_size, num_symbols_per_frame)
-            h = out[0] if isinstance(out, (list, tuple)) else out
-            # Force h to 2D [batch, num_symbols]; mapper output may be [batch, num_symbols, 1]
-            h_flat = tf.reshape(h, [-1])
-            h_2d = tf.reshape(h_flat, [current_batch_size, num_symbols_per_frame])
-            h_2d = tf.cast(h_2d, symbols_normalized.dtype)
-            symbols_2d = tf.squeeze(symbols_normalized, axis=-1)  # [batch, num_symbols]
-            faded_2d = h_2d * symbols_2d
-            faded_symbols = tf.expand_dims(faded_2d, axis=-1)  # [batch, num_symbols, 1] for AWGN
+            
+            # Get channel gains: [batch_size, num_rx, num_rx_ant, num_tx, num_tx_ant, num_time_steps]
+            # For SISO: [batch, 1, 1, 1, 1, num_symbols]
+            h = channel(current_batch_size, num_symbols_per_frame)
+            h = tf.cast(h, symbols_normalized.dtype)
+            
+            # Squeeze h to [batch, num_symbols] for SISO multiplication
+            h_squeezed = tf.squeeze(h, axis=[1, 2, 3, 4])
+            
+            # If symbols is [batch, num_symbols, 1] or [batch, num_symbols]
+            if len(symbols_normalized.shape) == 3:
+                h_expanded = tf.expand_dims(h_squeezed, axis=-1)
+                faded_symbols = h_expanded * symbols_normalized
+            else:
+                faded_symbols = h_squeezed * symbols_normalized
+                
+            # Add AWGN
             awgn = AWGN()
             snr_tensor_ray = tf.cast(snr_db, tf.float32)
             out_awgn = awgn([faded_symbols, snr_tensor_ray])
             received_symbols = out_awgn[0] if isinstance(out_awgn, (list, tuple)) else out_awgn
+            
+            # Normalize received_symbols for demapper (it expects same shape as mapper output or [batch, num_symbols])
+            # If we have [batch, num_symbols, 1], we might need to squeeze it if demapper complains
             if len(received_symbols.shape) == 3 and received_symbols.shape[-1] == 1:
                 received_symbols = tf.squeeze(received_symbols, axis=-1)
 
