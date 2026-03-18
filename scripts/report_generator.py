@@ -21,6 +21,7 @@ def load_kpis(kpis_path: Path) -> dict:
 
 
 def plot_bler_vs_snr(bler_vs_snr: list[dict], output_path: Path) -> None:
+    df = pd.DataFrame(bler_vs_snr)
     if df.empty:
         plt.figure(figsize=(8, 5))
         plt.title("BLER vs SNR (no data)")
