@@ -4,8 +4,10 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
 try:
     from airflow.providers.standard.operators.hitl import HITLOperator
+    from airflow.providers.standard.operators.python import BranchPythonOperator
 except ImportError:
     HITLOperator = None
+    BranchPythonOperator = None
 from datetime import datetime, timedelta
 import os
 import sys
@@ -73,6 +75,23 @@ def run_simulations_callable(run_id, **kwargs):
         print(f"Running simulation {i+1}/{plan_size}...")
         sim_main(run_id, i)
 
+
+def generate_plan_callable(**kwargs):
+    """调用 run_plan_generator，从 dag_run.conf 读取 seed_id 或 reproduce_run_id。"""
+    dag_run = kwargs.get('dag_run')
+    run_id = dag_run.run_id if dag_run else kwargs.get('run_id', '')
+    project_root = get_project_root()
+    scripts_dir = os.path.join(project_root, 'scripts')
+    config = getattr(dag_run, 'conf', None) or {}
+    # seed_id 优先：自定义 ID，不依赖时间；reproduce_run_id 次之：复现某次 run
+    seed_id = (config.get('seed_id') or config.get('reproduce_run_id') or '').strip() or None
+    logging.info(f"generate_plan: run_id={run_id}, seed_id={seed_id!r} (from conf)")
+    import subprocess
+    cmd = [sys.executable, os.path.join(scripts_dir, 'run_plan_generator.py'), run_id]
+    if seed_id:
+        cmd.append(seed_id)
+    subprocess.run(cmd, check=True, cwd=project_root)
+
 # Define the DAG
 with DAG(
     'sionna_etl_pipeline',
@@ -84,11 +103,10 @@ with DAG(
     tags=['sionna', 'etl'],
 ) as dag:
 
-    # 1. Generate Plan
-    generate_plan = BashOperator(
+    # 1. Generate Plan（触发时 conf 传入 seed_id 或 reproduce_run_id 控制种子，不依赖时间）
+    generate_plan = PythonOperator(
         task_id='generate_plan',
-        bash_command='python "{{ params.scripts_dir }}/run_plan_generator.py" "{{ run_id }}"',
-        params={'scripts_dir': os.path.join(get_project_root(), 'scripts')},
+        python_callable=generate_plan_callable,
     )
 
     # 2. Simulation
@@ -131,12 +149,26 @@ with DAG(
     )
 
     # 5.5 Human-in-the-loop: Review KPIs before generating report (需要 triggerer 服务)
-    if HITLOperator:
+    # Reject 时跳过 generate_report，需配合 BranchPythonOperator
+    if HITLOperator and BranchPythonOperator:
         review_results = HITLOperator(
             task_id='review_results',
             subject="Review simulation KPIs before generating report",
             options=["Approve", "Reject"],
             body="Please review the KPIs in artifacts/<run_id>/kpis.json. Approve to proceed with report generation.",
+        )
+        skip_report = EmptyOperator(task_id='skip_report')
+
+        def _branch_on_review(**context):
+            payload = context['ti'].xcom_pull(task_ids='review_results')
+            chosen = (payload or {}).get('chosen_options') or []
+            if chosen and chosen[0] == "Approve":
+                return "generate_report"
+            return "skip_report"
+
+        check_review = BranchPythonOperator(
+            task_id='check_review',
+            python_callable=_branch_on_review,
         )
     else:
         # Fallback for environments where HITLOperator is not available
@@ -156,7 +188,8 @@ with DAG(
             python_callable=review_kpis_callable,
             op_kwargs={'run_id': '{{ run_id }}'},
         )
-
+        check_review = None
+        skip_report = None
 
     # 6. Report Generation
     generate_report = BashOperator(
@@ -169,4 +202,8 @@ with DAG(
     )
 
     # Set dependencies
-    generate_plan >> simulate >> transform >> quality_check >> compute_kpis >> review_results >> generate_report
+    generate_plan >> simulate >> transform >> quality_check >> compute_kpis >> review_results
+    if check_review is not None:
+        review_results >> check_review >> [generate_report, skip_report]
+    else:
+        review_results >> generate_report

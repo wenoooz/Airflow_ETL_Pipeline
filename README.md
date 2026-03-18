@@ -11,10 +11,7 @@ An Apache Airflow pipeline that runs reproducible Sionna simulations, collects r
 From the **project root** (where `docker-compose.yml` and `Dockerfile` are):
 
 ```bash
-# First time: build the image (includes TensorFlow and Sionna)
 docker compose build
-
-# Start Airflow
 docker compose up -d
 ```
 
@@ -35,8 +32,24 @@ docker logs airflow-sionna 2>&1 | findstr -i "password"
 
 1. In the Airflow UI, find the DAG **sionna_etl_pipeline** and turn it **on** (unpause).
 2. Click **Trigger DAG** (play button) to run it once.
-3. After **compute_kpis**, the DAG pauses at **review_results** (HITLOperator). In the task instance details, click **Approve** to continue or **Reject** to skip report generation.
+3. After **compute_kpis**, the DAG pauses at **review_results** (HITLOperator). Click **Approve** to generate the report, or **Reject** to skip report generation (downstream `generate_report` will be skipped).
 4. When all tasks are green, results are written under **`artifacts/<run_id>/`** on your machine.
+
+### Reproducing with seeds
+
+Trigger the DAG with config to control random seeds :
+
+**Option 1 – Custom seed ID** (recommended for reproducibility):
+```json
+{"seed_id": "11"}
+```
+Use any fixed string and same `seed_id` always yields the same seeds.
+
+**Option 2 – Reproduce a specific run:**
+```json
+{"reproduce_run_id": "manual__2026-03-18T16-43-40+00-00"}
+```
+Use the `run_id` or artifacts folder name of the run you want to reproduce.
 
 ### Output location
 
