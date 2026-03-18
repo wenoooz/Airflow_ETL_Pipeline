@@ -47,6 +47,12 @@ def generate_run_plan(config: dict, run_id: str) -> list[dict]:
         itertools.product(channel_types_ordered, modulations, snr_db, repeat_indices)
     )
 
+    # Ensure at least 120 simulation points as per requirements
+    if len(combinations) < 120:
+        raise ValueError(f"Current configuration only produces {len(combinations)} simulation points. "
+                         f"Requirements specify at least 120 (e.g., 2 channels * 2 modulations * 10 SNRs * 3 repeats). "
+                         f"Please update config/param_grid.yaml.")
+
     run_plan = []
     run_id_hash = int(hashlib.md5(run_id.encode()).hexdigest()[:8], 16)
     for idx, (channel_type, modulation, snr, repeat_idx) in enumerate(combinations):

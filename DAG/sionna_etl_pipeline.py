@@ -2,6 +2,11 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
+try:
+    from airflow.providers.standard.operators.hitl import HITLOperator
+except ImportError:
+    # Fallback for environments where HITLOperator is not available
+    HITLOperator = None
 from datetime import datetime, timedelta
 import os
 import sys
@@ -127,24 +132,29 @@ with DAG(
     )
 
     # 5.5 Human-in-the-loop: Review KPIs before generating report
-    # Note: In a production environment with Airflow 2.10+, you would use HITLOperator.
-    # For this project, we implement a review step that logs the KPI path for manual verification.
-    def review_kpis_callable(run_id, **kwargs):
-        project_root = get_project_root()
-        kpi_path = os.path.join(project_root, 'artifacts', _safe_run_id(run_id), 'kpis.json')
-        logging.info(f"--- HITL Review Required ---")
-        logging.info(f"Please review simulation KPIs at: {kpi_path}")
-        if os.path.exists(kpi_path):
-            with open(kpi_path, 'r') as f:
-                kpis = json.load(f)
-                logging.info(f"Overall Mean BLER: {kpis.get('overall', {}).get('mean_bler')}")
-        logging.info(f"Proceeding to report generation...")
+    if HITLOperator:
+        review_results = HITLOperator(
+            task_id='review_results',
+            # HITLOperator in Airflow 3.x is used to pause the DAG until manual approval
+        )
+    else:
+        # Fallback for environments where HITLOperator is not available
+        def review_kpis_callable(run_id, **kwargs):
+            project_root = get_project_root()
+            kpi_path = os.path.join(project_root, 'artifacts', _safe_run_id(run_id), 'kpis.json')
+            logging.info(f"--- HITL Review Required ---")
+            logging.info(f"Please review simulation KPIs at: {kpi_path}")
+            if os.path.exists(kpi_path):
+                with open(kpi_path, 'r') as f:
+                    kpis = json.load(f)
+                    logging.info(f"Overall Mean BLER: {kpis.get('overall', {}).get('mean_bler')}")
+            logging.info(f"Proceeding to report generation...")
 
-    review_results = PythonOperator(
-        task_id='review_results',
-        python_callable=review_kpis_callable,
-        op_kwargs={'run_id': '{{ run_id }}'},
-    )
+        review_results = PythonOperator(
+            task_id='review_results',
+            python_callable=review_kpis_callable,
+            op_kwargs={'run_id': '{{ run_id }}'},
+        )
 
 
     # 6. Report Generation

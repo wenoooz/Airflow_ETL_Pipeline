@@ -219,6 +219,7 @@ def main(run_id: str, run_index: int, run_plan_path: Path | None = None) -> None
         "run_index": run_index,
         "seed": seed,
         "snr_db": snr_db,
+        "signal_to_noise_ratio_db": snr_db, # Aligned with PDF requirement names
         "channel_type": channel_type,
         "modulation": modulation,
         "bler": metrics["bler"],

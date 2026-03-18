@@ -27,6 +27,7 @@ def _to_native(obj):
 
 REQUIRED_COLUMNS = [
     "snr_db",
+    "signal_to_noise_ratio_db",
     "channel_type",
     "modulation",
     "ber",
