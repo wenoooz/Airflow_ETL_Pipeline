@@ -106,13 +106,13 @@ def simulate_siso_link(
             norm = tf.cast(tf.sqrt(symbol_power + 1e-10), symbols.dtype)
             symbols_normalized = symbols / norm
             
-            # Get channel gains: [batch_size, num_rx, num_rx_ant, num_tx, num_tx_ant, num_time_steps]
-            # For SISO: [batch, 1, 1, 1, 1, num_symbols]
-            h = channel(current_batch_size, num_symbols_per_frame)
+            # Get channel gains: RayleighBlockFading returns (h, delays)
+            # h shape: [batch, num_rx, num_rx_ant, num_tx, num_tx_ant, 1, num_time_steps]
+            h, _delays = channel(current_batch_size, num_symbols_per_frame)
             h = tf.cast(h, symbols_normalized.dtype)
             
             # Squeeze h to [batch, num_symbols] for SISO multiplication
-            h_squeezed = tf.squeeze(h, axis=[1, 2, 3, 4])
+            h_squeezed = tf.squeeze(h, axis=[1, 2, 3, 4, 5])
             
             # If symbols is [batch, num_symbols, 1] or [batch, num_symbols]
             if len(symbols_normalized.shape) == 3:

@@ -5,7 +5,6 @@ from airflow.operators.empty import EmptyOperator
 try:
     from airflow.providers.standard.operators.hitl import HITLOperator
 except ImportError:
-    # Fallback for environments where HITLOperator is not available
     HITLOperator = None
 from datetime import datetime, timedelta
 import os
@@ -42,7 +41,7 @@ def cleanup_artifacts(context):
 
 # Default arguments for the DAG
 default_args = {
-    'owner': 'cline',
+    'owner': 'Xuewen SHAO & Xinyi LI',
     'depends_on_past': False,
     'start_date': datetime(2026, 1, 1),
     'email_on_failure': False,
@@ -131,11 +130,13 @@ with DAG(
         },
     )
 
-    # 5.5 Human-in-the-loop: Review KPIs before generating report
+    # 5.5 Human-in-the-loop: Review KPIs before generating report (需要 triggerer 服务)
     if HITLOperator:
         review_results = HITLOperator(
             task_id='review_results',
-            # HITLOperator in Airflow 3.x is used to pause the DAG until manual approval
+            subject="Review simulation KPIs before generating report",
+            options=["Approve", "Reject"],
+            body="Please review the KPIs in artifacts/<run_id>/kpis.json. Approve to proceed with report generation.",
         )
     else:
         # Fallback for environments where HITLOperator is not available

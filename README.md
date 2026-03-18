@@ -35,7 +35,8 @@ docker logs airflow-sionna 2>&1 | findstr -i "password"
 
 1. In the Airflow UI, find the DAG **sionna_etl_pipeline** and turn it **on** (unpause).
 2. Click **Trigger DAG** (play button) to run it once.
-3. When all tasks are green, results are written under **`artifacts/<run_id>/`** on your machine.
+3. After **compute_kpis**, the DAG pauses at **review_results** (HITLOperator). In the task instance details, click **Approve** to continue or **Reject** to skip report generation.
+4. When all tasks are green, results are written under **`artifacts/<run_id>/`** on your machine.
 
 ### Output location
 
@@ -55,6 +56,6 @@ Open `report.html` in a browser to view the report.
 - **`config/`** – Parameter grid (`param_grid.yaml`) for simulations
 - **`artifacts/`** – Pipeline output (per-run folders; ignored by Git)
 - **`Dockerfile`** – Airflow image with LLVM, TensorFlow, Sionna
-- **`docker-compose.yml`** – Single-service Airflow (standalone) with project and `artifacts` mounted
+- **`docker-compose.yml`** – Airflow standalone + triggerer (for HITL/HITLOperator), project and `artifacts` mounted
 
 

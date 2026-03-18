@@ -1,6 +1,4 @@
 
-version: "3.8"
-
 services:
   airflow:
     build: .
@@ -15,6 +13,7 @@ services:
       AIRFLOW__CORE__EXECUTOR: SequentialExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__API_AUTH__JWT_SECRET: "${AIRFLOW__API_AUTH__JWT_SECRET:-airflow-sionna-dev-jwt-secret}"
       PROJECT_ROOT: /opt/airflow
     working_dir: /opt/airflow
     command: airflow standalone
@@ -26,3 +25,24 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  airflow-triggerer:
+    build: .
+    image: airflow-sionna:latest
+    container_name: airflow-sionna-triggerer
+    user: "${AIRFLOW_UID:-50000}:0"
+    volumes:
+      - .:/opt/airflow
+      - ./artifacts:/opt/airflow/artifacts
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/DAG
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__API_AUTH__JWT_SECRET: "${AIRFLOW__API_AUTH__JWT_SECRET:-airflow-sionna-dev-jwt-secret}"
+      PROJECT_ROOT: /opt/airflow
+    working_dir: /opt/airflow
+    command: airflow triggerer
+    depends_on:
+      airflow:
+        condition: service_healthy
