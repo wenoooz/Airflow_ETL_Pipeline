@@ -8,12 +8,10 @@ import pandas as pd
 from _path_utils import safe_run_id
 
 def get_project_root() -> Path:
-    """Resolve project root (parent of scripts/)."""
     return Path(__file__).resolve().parent.parent
 
 
 def load_dataset(csv_path: Path) -> pd.DataFrame:
-    """Load consolidated dataset from CSV."""
     if not csv_path.is_file():
         raise FileNotFoundError(f"Dataset not found: {csv_path}")
     return pd.read_csv(csv_path, encoding="utf-8")

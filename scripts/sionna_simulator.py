@@ -20,21 +20,17 @@ except ImportError as e:
     sys.exit(1)
 
 def get_project_root() -> Path:
-    """Resolve project root (parent of scripts/)."""
     return Path(__file__).resolve().parent.parent
 
 def create_channel(channel_type: str, **kwargs):
-    """Create channel model (AWGN or Rayleigh)."""
     if channel_type.upper() == "AWGN":
         return AWGN()
     elif channel_type.upper() == "RAYLEIGH":
-        # Current Sionna RayleighBlockFading expects num_rx, num_tx, num_rx_ant, num_tx_ant
         return RayleighBlockFading(num_rx=1, num_tx=1, num_rx_ant=1, num_tx_ant=1)
     else:
         raise ValueError(f"Unknown channel type: {channel_type}")
 
 def create_modulation(modulation: str):
-    """Create mapper and demapper for modulation scheme."""
     if modulation.upper() == "QPSK":
         num_bits_per_symbol = 2
     elif modulation.upper() == "16QAM":
@@ -53,28 +49,21 @@ def simulate_siso_link(
     batch_size: int,
     seed: int,
 ) -> dict:   
-    # Set random seeds for reproducibility
     import random
     random.seed(seed)
     np.random.seed(seed)
     tf.random.set_seed(seed)
-    # For full reproducibility on GPU, though might slow down simulation
-    # os.environ['TF_DETERMINISTIC_OPS'] = '1'
-
-    # Create components
+  
     mapper, demapper, num_bits_per_symbol = create_modulation(modulation)
     channel = create_channel(channel_type)
 
-    # Binary source
     binary_source = BinarySource(seed=seed)
 
-    # Accumulators for errors
     total_bit_errors = 0
     total_block_errors = 0
     total_bits = 0
     total_blocks = 0
 
-    # Simulate in batches
     num_batches = (num_frames + batch_size - 1) // batch_size
     num_symbols_per_frame = 100  # Fixed number of symbols per frame
 
@@ -83,70 +72,52 @@ def simulate_siso_link(
         if current_batch_size <= 0:
             break
 
-        # Generate random bits: [batch_size, num_symbols, num_bits_per_symbol]
         bits_shape = [current_batch_size, num_symbols_per_frame, num_bits_per_symbol]
         bits = binary_source(bits_shape)
 
-        # Map bits to symbols
         symbols = mapper(bits)
 
-        # Channel processing
         if channel_type.upper() == "AWGN":
-            # AWGN channel: normalize power and add noise
             symbol_power = tf.reduce_mean(tf.abs(symbols) ** 2)
             norm = tf.cast(tf.sqrt(symbol_power + 1e-10), symbols.dtype)
             symbols_normalized = symbols / norm
             out = channel([symbols_normalized, tf.cast(snr_db, tf.float32)])
             received_symbols = out[0] if isinstance(out, (list, tuple)) else out
         else:
-            # Rayleigh: ensure shapes match for point-to-point multiplication
-            # Mapper output is [batch, num_symbols, bits_per_symbol] (Sionna 0.18+)
-            # We need to normalize and apply channel
+            
             symbol_power = tf.reduce_mean(tf.abs(symbols) ** 2)
             norm = tf.cast(tf.sqrt(symbol_power + 1e-10), symbols.dtype)
             symbols_normalized = symbols / norm
             
-            # Get channel gains: RayleighBlockFading returns (h, delays)
-            # h shape: [batch, num_rx, num_rx_ant, num_tx, num_tx_ant, 1, num_time_steps]
             h, _delays = channel(current_batch_size, num_symbols_per_frame)
             h = tf.cast(h, symbols_normalized.dtype)
             
-            # Squeeze h to [batch, num_symbols] for SISO multiplication
             h_squeezed = tf.squeeze(h, axis=[1, 2, 3, 4, 5])
             
-            # If symbols is [batch, num_symbols, 1] or [batch, num_symbols]
             if len(symbols_normalized.shape) == 3:
                 h_expanded = tf.expand_dims(h_squeezed, axis=-1)
                 faded_symbols = h_expanded * symbols_normalized
             else:
                 faded_symbols = h_squeezed * symbols_normalized
                 
-            # Add AWGN
             awgn = AWGN()
             snr_tensor_ray = tf.cast(snr_db, tf.float32)
             out_awgn = awgn([faded_symbols, snr_tensor_ray])
             received_symbols = out_awgn[0] if isinstance(out_awgn, (list, tuple)) else out_awgn
-            
-            # Normalize received_symbols for demapper (it expects same shape as mapper output or [batch, num_symbols])
-            # If we have [batch, num_symbols, 1], we might need to squeeze it if demapper complains
+           
             if len(received_symbols.shape) == 3 and received_symbols.shape[-1] == 1:
                 received_symbols = tf.squeeze(received_symbols, axis=-1)
 
-        # Demap symbols to LLRs (demapper expects [batch, num_symbols] and SNR as float32)
         snr_tensor = tf.cast(snr_db, tf.float32)
         llrs = demapper([received_symbols, snr_tensor])
 
-        # Hard decision: convert LLRs to bits
         bits_hat = tf.cast(llrs > 0, tf.float32)
 
-        # Compute errors using Sionna utilities
-        # Reshape for error computation: flatten last two dimensions
         bits_flat = tf.reshape(bits, [-1])
         bits_hat_flat = tf.reshape(bits_hat, [-1])
         
         bit_errors = tf.reduce_sum(tf.cast(bits_flat != bits_hat_flat, tf.int64))
         
-        # Block errors: at least one error per block (symbol)
         bits_per_block = tf.reshape(bits, [current_batch_size * num_symbols_per_frame, num_bits_per_symbol])
         bits_hat_per_block = tf.reshape(bits_hat, [current_batch_size * num_symbols_per_frame, num_bits_per_symbol])
         block_errors = tf.reduce_sum(
@@ -158,12 +129,9 @@ def simulate_siso_link(
         total_bits += int(tf.size(bits).numpy())
         total_blocks += current_batch_size * num_symbols_per_frame
 
-    # Compute metrics
     ber = float(total_bit_errors) / total_bits if total_bits > 0 else 0.0
     bler = float(total_block_errors) / total_blocks if total_blocks > 0 else 0.0
 
-    # Effective throughput: (1 - BLER) * bits_per_symbol
-    # Assumes normalized symbol rate = 1
     effective_throughput = (1.0 - bler) * num_bits_per_symbol
 
     return {
@@ -184,7 +152,6 @@ def main(run_id: str, run_index: int, run_plan_path: Path | None = None) -> None
     if run_plan_path is None:
         run_plan_path = project_root / "artifacts" / safe_run_id(run_id) / "run_plan.json"
 
-    # Load run plan
     with open(run_plan_path, encoding="utf-8") as f:
         run_plan_data = json.load(f)
 
@@ -194,15 +161,13 @@ def main(run_id: str, run_index: int, run_plan_path: Path | None = None) -> None
 
     plan_row = run_plan[run_index]
 
-    # Extract parameters
     channel_type = plan_row["channel_type"]
     modulation = plan_row["modulation"]
     snr_db = plan_row["snr_db"]
     seed = plan_row["seed"]
     num_frames = plan_row["num_frames_per_run"]
 
-    # Run simulation
-    batch_size = 32  # Process frames in batches
+    batch_size = 32  
     metrics = simulate_siso_link(
         channel_type=channel_type,
         modulation=modulation,
@@ -212,7 +177,6 @@ def main(run_id: str, run_index: int, run_plan_path: Path | None = None) -> None
         seed=seed,
     )
 
-    # Prepare output
     output = {
         "timestamp": datetime.now().isoformat(),
         "run_id": run_id,
@@ -232,7 +196,6 @@ def main(run_id: str, run_index: int, run_plan_path: Path | None = None) -> None
         "total_block_errors": metrics["total_block_errors"],
     }
 
-    # Write output JSON
     output_dir = project_root / "artifacts" / safe_run_id(run_id) / "raw"
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{run_index}.json"

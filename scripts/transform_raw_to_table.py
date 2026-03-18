@@ -8,12 +8,10 @@ from _path_utils import safe_run_id
 
 
 def get_project_root() -> Path:
-    """Resolve project root (parent of scripts/)."""
     return Path(__file__).resolve().parent.parent
 
 
 def load_raw_jsons(raw_dir: Path) -> list[dict]:
-    """Load all JSON files from raw directory, sorted by run_index."""
     if not raw_dir.is_dir():
         raise FileNotFoundError(f"Raw directory not found: {raw_dir}")
 
@@ -32,28 +30,12 @@ def load_raw_jsons(raw_dir: Path) -> list[dict]:
 
 
 def transform_to_table(rows: list[dict]) -> pd.DataFrame:
-    """
-    Build a single table from raw JSON rows.
 
-    Each row corresponds to one simulation point with columns:
-    timestamp, run_id, run_index, seed, snr_db, channel_type, modulation,
-    bler, ber, effective_throughput, num_frames, total_bits, total_bit_errors,
-    total_blocks, total_block_errors.
-    """
     return pd.DataFrame(rows)
 
 
 def main(run_id: str, project_root: Path | None = None) -> Path:
-    """
-    Read raw JSONs, build dataset table, write CSV.
-
-    Args:
-        run_id: Run identifier (e.g. from run_plan).
-        project_root: Project root path; if None, auto-detect.
-
-    Returns:
-        Path to written dataset.csv.
-    """
+   
     if project_root is None:
         project_root = get_project_root()
 

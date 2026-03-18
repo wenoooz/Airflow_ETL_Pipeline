@@ -14,7 +14,6 @@ def get_project_root() -> Path:
 
 
 def load_kpis(kpis_path: Path) -> dict:
-    """Load kpis.json."""
     if not kpis_path.is_file():
         raise FileNotFoundError(f"KPIs not found: {kpis_path}")
     with open(kpis_path, encoding="utf-8") as f:
@@ -22,15 +21,12 @@ def load_kpis(kpis_path: Path) -> dict:
 
 
 def plot_bler_vs_snr(bler_vs_snr: list[dict], output_path: Path) -> None:
-    """Plot BLER vs SNR with one curve per (channel_type, modulation)."""
-    df = pd.DataFrame(bler_vs_snr)
     if df.empty:
         plt.figure(figsize=(8, 5))
         plt.title("BLER vs SNR (no data)")
         plt.savefig(output_path, dpi=150, bbox_inches="tight")
         plt.close()
         return
-
 
     bler_vals = df["mean_bler"].clip(lower=1e-6)
     bler_min = float(bler_vals.min())
@@ -60,7 +56,6 @@ def plot_bler_vs_snr(bler_vs_snr: list[dict], output_path: Path) -> None:
 
 
 def plot_ber_vs_snr(bler_vs_snr: list[dict], output_path: Path) -> None:
-    """Plot BER vs SNR with one curve per (channel_type, modulation)."""
     df = pd.DataFrame(bler_vs_snr)
     if df.empty:
         plt.figure(figsize=(8, 5))
@@ -97,7 +92,6 @@ def plot_ber_vs_snr(bler_vs_snr: list[dict], output_path: Path) -> None:
 
 
 def plot_throughput_vs_snr(bler_vs_snr: list[dict], output_path: Path) -> None:
-    """Plot effective throughput vs SNR with one curve per (channel_type, modulation)."""
     df = pd.DataFrame(bler_vs_snr)
     if df.empty:
         plt.figure(figsize=(8, 5))
@@ -134,33 +128,28 @@ def plot_throughput_vs_snr(bler_vs_snr: list[dict], output_path: Path) -> None:
 
 
 def write_interpretation(kpis: dict) -> str:
-    """Produce a short written interpretation from KPIs and curves."""
     run_id = kpis.get("run_id", "?")
     overall = kpis.get("overall", {})
     by_cm = kpis.get("by_channel_modulation", [])
     meta = kpis.get("meta", {})
     bler_vs_snr = kpis.get("bler_vs_snr", [])
 
-    # Dynamic interpretation logic
     interpretation_text = (
         "Analysis of the simulation results reveals several key trends in link performance. "
     )
     
     if bler_vs_snr:
         df = pd.DataFrame(bler_vs_snr)
-        # Check if BLER decreases as SNR increases (General trend)
         correlation = df['snr_db'].corr(df['mean_bler'])
         if correlation < -0.5:
-            interpretation_text += "As expected, the Block Error Rate (BLER) generally decreases as the Signal-to-Noise Ratio (SNR) increases across all configurations. "
-        
-        # Compare AWGN vs Rayleigh if both exist
+            interpretation_text += "As expected, the Block Error Rate (BLER) generally decreases as the Signal-to-Noise Ratio (SNR) increases across all configurations. "       
+      
         if 'AWGN' in df['channel_type'].values and 'Rayleigh' in df['channel_type'].values:
             awgn_bler = df[df['channel_type'] == 'AWGN']['mean_bler'].mean()
             rayleigh_bler = df[df['channel_type'] == 'Rayleigh']['mean_bler'].mean()
             if rayleigh_bler > awgn_bler:
                 interpretation_text += "The Rayleigh fading channel exhibits significantly higher error rates compared to the AWGN channel at equivalent SNR levels, due to multipath fading effects. "
 
-        # Compare QPSK vs 16QAM
         if 'QPSK' in df['modulation'].values and '16QAM' in df['modulation'].values:
             qpsk_bler = df[df['modulation'] == 'QPSK']['mean_bler'].mean()
             qam_bler = df[df['modulation'] == '16QAM']['mean_bler'].mean()
@@ -270,10 +259,7 @@ def generate_html_report(
 
 
 def main(run_id: str, project_root: Path | None = None) -> Path:
-    """
-    Generate report and plot; write artifacts/<run_id>/report.html and plots/bler_vs_snr.png.
-    Returns:Path to report.html.
-    """
+
     if project_root is None:
         project_root = get_project_root()
 

@@ -29,7 +29,6 @@ def load_config(config_path: Path) -> dict:
 
 
 def generate_run_plan(config: dict, run_id: str, seed_run_id: str | None = None) -> list[dict]:
-    """Generate run plan. seed_run_id: 用于复现时指定种子基准，与 run_id 相同时可复现结果。"""
     channel_types = config["channel_types"]
     channel_types_ordered = (
         ["Rayleigh", "AWGN"]
@@ -55,7 +54,6 @@ def generate_run_plan(config: dict, run_id: str, seed_run_id: str | None = None)
                          f"Please update config/param_grid.yaml.")
 
     run_plan = []
-    # 复现：用 safe_run_id 统一格式（冒号/短横线），避免 run_id 与 artifacts 文件夹名不一致导致 hash 不同
     hash_id = safe_run_id((seed_run_id or run_id).strip() or run_id)
     run_id_hash = int(hashlib.md5(hash_id.encode()).hexdigest()[:8], 16)
     for idx, (channel_type, modulation, snr, repeat_idx) in enumerate(combinations):
@@ -71,15 +69,11 @@ def generate_run_plan(config: dict, run_id: str, seed_run_id: str | None = None)
             "num_frames_per_run": num_frames,
         })
 
-    return run_plan, hash_id
+    return run_plan
 
 
 def main(run_id: str | None = None, seed_run_id: str | None = None) -> str:
-    """
-    Generate run plan and write to artifacts/<run_id>/run_plan.json.
-    seed_run_id: 复现时传入，与要复现的 run_id 相同则 seeds 一致。
-    Returns run_id.
-    """
+
     project_root = get_project_root()
     config_path = project_root / "config" / "param_grid.yaml"
 
@@ -87,7 +81,7 @@ def main(run_id: str | None = None, seed_run_id: str | None = None) -> str:
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     config = load_config(config_path)
-    run_plan, hash_id = generate_run_plan(config, run_id, seed_run_id=seed_run_id)
+    run_plan = generate_run_plan(config, run_id, seed_run_id=seed_run_id)
 
     output_dir = project_root / "artifacts" / safe_run_id(run_id)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -96,7 +90,6 @@ def main(run_id: str | None = None, seed_run_id: str | None = None) -> str:
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump({
             "run_id": run_id,
-            "seed_hash_id": hash_id,  # 用于复现的基准 ID，便于核对
             "timestamp": datetime.now().isoformat(),
             "config": config,
             "plan_size": len(run_plan),

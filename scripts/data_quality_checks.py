@@ -1,5 +1,3 @@
-
-
 import json
 import sys
 from pathlib import Path
@@ -9,9 +7,7 @@ import pandas as pd
 
 from _path_utils import safe_run_id
 
-
 def _to_native(obj):
-    """Convert numpy types to native Python for JSON serialization."""
     if isinstance(obj, dict):
         return {k: _to_native(v) for k, v in obj.items()}
     if isinstance(obj, list):
@@ -24,7 +20,6 @@ def _to_native(obj):
         return obj.tolist()
     return obj
 
-
 REQUIRED_COLUMNS = [
     "snr_db",
     "signal_to_noise_ratio_db",
@@ -35,21 +30,17 @@ REQUIRED_COLUMNS = [
     "effective_throughput",
 ]
 
-
 def get_project_root() -> Path:
-    """Resolve project root (parent of scripts/)."""
     return Path(__file__).resolve().parent.parent
 
 
 def load_dataset(csv_path: Path) -> pd.DataFrame:
-    """Load consolidated dataset from CSV."""
     if not csv_path.is_file():
         raise FileNotFoundError(f"Dataset not found: {csv_path}")
     return pd.read_csv(csv_path, encoding="utf-8")
 
 
 def load_run_plan(run_plan_path: Path) -> dict:
-    """Load run plan JSON."""
     if not run_plan_path.is_file():
         raise FileNotFoundError(f"Run plan not found: {run_plan_path}")
     with open(run_plan_path, encoding="utf-8") as f:
@@ -80,7 +71,6 @@ def check_no_missing(df: pd.DataFrame) -> dict:
 
 
 def check_row_count(df: pd.DataFrame, expected_size: int) -> dict:
-    """Check that number of rows equals expected plan size."""
     actual = len(df)
     passed = actual == expected_size
     return {
@@ -93,7 +83,6 @@ def check_row_count(df: pd.DataFrame, expected_size: int) -> dict:
 
 
 def check_metric_ranges(df: pd.DataFrame) -> dict:
-    """Check that BER/BLER are in [0,1] and effective_throughput >= 0."""
     for col in ["ber", "bler", "effective_throughput"]:
         if col not in df.columns:
             return {
@@ -122,7 +111,6 @@ def check_metric_ranges(df: pd.DataFrame) -> dict:
 
 
 def check_snr_matches_plan(df: pd.DataFrame, expected_snr: list) -> dict:
-    """Check that SNR values in dataset match the planned SNR set."""
     if "snr_db" not in df.columns:
         return {
             "check": "snr_values_match_plan",
@@ -144,11 +132,9 @@ def check_snr_matches_plan(df: pd.DataFrame, expected_snr: list) -> dict:
 
 
 def check_parameter_combinations(df: pd.DataFrame, run_plan_data: dict) -> dict:
-    """Check that every planned (channel, modulation, snr) combination exists in the dataset."""
     plan = run_plan_data.get("run_plan", [])
     expected_combos = set()
     for row in plan:
-        # Create a canonical tuple representation
         combo = (row["channel_type"], row["modulation"], float(row["snr_db"]))
         expected_combos.add(combo)
 
@@ -171,16 +157,7 @@ def check_parameter_combinations(df: pd.DataFrame, run_plan_data: dict) -> dict:
 
 
 def run_checks(run_id: str, project_root: Path | None = None) -> dict:
-    """
-    Run all data quality checks and return results.
-
-    Args:
-        run_id: Run identifier.
-        project_root: Project root path; if None, auto-detect.
-
-    Returns:
-        Dict with keys: run_id, all_passed, checks (list of check results).
-    """
+   
     if project_root is None:
         project_root = get_project_root()
 
@@ -213,12 +190,7 @@ def run_checks(run_id: str, project_root: Path | None = None) -> dict:
 
 
 def main(run_id: str, project_root: Path | None = None) -> Path:
-    """
-    Run checks, write dq_checks.json, exit 0 if all passed else 1.
-
-    Returns:
-        Path to written dq_checks.json.
-    """
+   
     result = run_checks(run_id, project_root)
 
     output_path = (project_root or get_project_root()) / "artifacts" / safe_run_id(run_id) / "dq_checks.json"

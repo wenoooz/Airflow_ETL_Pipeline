@@ -1,6 +1,3 @@
-# Sionna ETL Pipeline - 仿真参数网格配置
-# 2 channel × 2 modulation × 10 SNR × 3 repeats = 120 simulation points
-
 channel_types: [AWGN, Rayleigh]
 modulations: [QPSK, 16QAM]
 snr_db: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18]
