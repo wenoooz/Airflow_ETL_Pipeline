@@ -27,6 +27,16 @@ def load_config(config_path: Path) -> dict:
     with open(config_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
+def load_existing_run_plan(project_root: Path, source_run_id: str) -> dict:
+    source_path = project_root / "artifacts" / safe_run_id(source_run_id) / "run_plan.json"
+    if not source_path.is_file():
+        raise FileNotFoundError(
+            f"Reproduce source run_plan not found: {source_path}. "
+            f"Please make sure reproduce_run_id points to an existing run."
+        )
+    with open(source_path, encoding="utf-8") as f:
+        return json.load(f)
+
 
 def generate_run_plan(config: dict, run_id: str, seed_run_id: str | None = None) -> list[dict]:
     channel_types = config["channel_types"]
@@ -80,8 +90,17 @@ def main(run_id: str | None = None, seed_run_id: str | None = None) -> str:
     if run_id is None:
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    config = load_config(config_path)
-    run_plan = generate_run_plan(config, run_id, seed_run_id=seed_run_id)
+    if seed_run_id:
+        source_plan = load_existing_run_plan(project_root, seed_run_id)
+        config = source_plan.get("config", {})
+        run_plan = source_plan.get("run_plan", [])
+        if not run_plan:
+            raise ValueError(
+                f"Source run_plan is empty for reproduce_run_id={seed_run_id}"
+            )
+    else:
+        config = load_config(config_path)
+        run_plan = generate_run_plan(config, run_id, seed_run_id=seed_run_id)
 
     output_dir = project_root / "artifacts" / safe_run_id(run_id)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -91,6 +110,7 @@ def main(run_id: str | None = None, seed_run_id: str | None = None) -> str:
         json.dump({
             "run_id": run_id,
             "timestamp": datetime.now().isoformat(),
+            "seed_source_run_id": seed_run_id or run_id,
             "config": config,
             "plan_size": len(run_plan),
             "run_plan": run_plan,
