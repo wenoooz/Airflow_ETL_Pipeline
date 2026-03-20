@@ -127,7 +127,35 @@ with DAG(
             options=["Approve", "Reject"],
             body="Please review the KPIs in artifacts/<run_id>/kpis.json. Approve to proceed with report generation.",
         )
-        skip_report = EmptyOperator(task_id='skip_report')
+        def cleanup_rejected_version_callable(**context):
+            """
+            当 HITL 选择 Reject 时，直接清除当前 run 的版本数据（artifacts/<run_id>/）。
+            """
+            payload = context["ti"].xcom_pull(task_ids="review_results")
+            chosen = (payload or {}).get("chosen_options") or []
+            if not chosen or chosen[0] != "Reject":
+                logging.info("HITL not rejected (chosen=%s); skip artifacts cleanup.", chosen)
+                return
+
+            run_id = context.get("run_id")
+            project_root = get_project_root()
+            artifact_dir = os.path.join(project_root, "artifacts", _safe_run_id(run_id))
+
+            if not os.path.exists(artifact_dir):
+                logging.info("No artifacts directory to clean for run_id=%s: %s", run_id, artifact_dir)
+                return
+
+            logging.info("Reject selected; cleaning artifacts for run_id=%s at %s", run_id, artifact_dir)
+            try:
+                shutil.rmtree(artifact_dir)
+                logging.info("Successfully removed %s", artifact_dir)
+            except Exception as e:
+                logging.error("Failed to remove %s: %s", artifact_dir, e)
+
+        skip_report = PythonOperator(
+            task_id="skip_report",
+            python_callable=cleanup_rejected_version_callable,
+        )
 
         def _branch_on_review(**context):
             payload = context['ti'].xcom_pull(task_ids='review_results')

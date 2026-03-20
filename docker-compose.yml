@@ -15,6 +15,10 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__API_AUTH__JWT_SECRET: "${AIRFLOW__API_AUTH__JWT_SECRET:-airflow-sionna-dev-jwt-secret}"
       PROJECT_ROOT: /opt/airflow
+     
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      LANGUAGE: en_US:en
     working_dir: /opt/airflow
     command: airflow standalone
     ports:
@@ -41,6 +45,10 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__API_AUTH__JWT_SECRET: "${AIRFLOW__API_AUTH__JWT_SECRET:-airflow-sionna-dev-jwt-secret}"
       PROJECT_ROOT: /opt/airflow
+    
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      LANGUAGE: en_US:en
     working_dir: /opt/airflow
     command: airflow triggerer
     depends_on:
